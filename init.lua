@@ -132,12 +132,8 @@ function advmarkers.display_formspec()
             if name == selected_name then
                 selected = id
             end
-            name = minetest.formspec_escape(name)
-            if name:sub(1, 1) == '#' then
-                name = '#' .. name
-            end
             formspec_list[#formspec_list + 1] = name
-            formspec = formspec .. name
+            formspec = formspec .. '##' .. minetest.formspec_escape(name)
         end
     end
 
