@@ -176,6 +176,11 @@ minetest.register_chatcommand('add_mrkr', {
         -- Validate the position
         if pos == 'here' then
             pos = minetest.localplayer:get_pos()
+        elseif pos == 'there' then
+            if not advmarkers.last_coords then
+                return false, 'No-one has used .coords yet!'
+            end
+            pos = advmarkers.last_coords
         else
             pos = string_to_pos(pos)
             if not pos then
@@ -266,6 +271,36 @@ minetest.register_chatcommand('mrkr_import', {
             return true, 'Markers imported!'
         else
             return false, 'Invalid advmarkers string!'
+        end
+    end
+})
+
+-- Chat channels .coords integration.
+-- You do not need to have chat channels installed for this to work.
+if not minetest.registered_on_receiving_chat_message then
+    minetest.registered_on_receiving_chat_message =
+        minetest.registered_on_receiving_chat_messages
+end
+
+table.insert(minetest.registered_on_receiving_chat_message, 1, function(msg)
+    local s, e = msg:find('Current Position: %-?[0-9]+, %-?[0-9]+, %-?[0-9]+%.')
+    if s and e then
+        local pos = string_to_pos(msg:sub(s + 18, e - 1))
+        if pos then
+            advmarkers.last_coords = pos
+        end
+    end
+end)
+
+-- Add '.mrkrthere'
+minetest.register_chatcommand('mrkrthere', {
+    params      = '',
+    description = 'Adds a (temporary) marker at the last ".coords" position.',
+    func = function(param)
+        if not advmarkers.last_coords then
+            return false, 'No-one has used ".coords" yet!'
+        elseif not advmarkers.set_hud_pos(advmarkers.last_coords) then
+            return false, 'Error setting the marker!'
         end
     end
 })
