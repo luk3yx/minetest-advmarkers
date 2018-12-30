@@ -16,7 +16,8 @@ create HUDs on their own.
  - `.mrkr_import`: Imports your markers from an advmarkers string (`.mrkr_import <advmarkers string>`). Any markers with the same name will not be overwritten, and if they do not have the same co-ordinates, `_` will be appended to the imported one.
  - `.mrkrthere`: Sets a marker at the last `.coords` position.
 
-If you die, a marker is automatically added at your death position.
+If you die, a marker is automatically added at your death position, and will
+update the last `.coords` position.
 
 ## Chat channels integration
 

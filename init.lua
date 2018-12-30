@@ -245,7 +245,9 @@ end)
 minetest.register_on_death(function()
     if minetest.localplayer then
         local name = os.date('Death on %Y-%m-%d %H:%M:%S')
-        advmarkers.set_marker(minetest.localplayer:get_pos(), name)
+        local pos  = minetest.localplayer:get_pos()
+        advmarkers.last_coords = pos
+        advmarkers.set_marker(pos, name)
         minetest.display_chat_message('Added marker "' .. name .. '".')
     end
 end)
