@@ -178,7 +178,7 @@ minetest.register_chatcommand('add_mrkr', {
             pos = minetest.localplayer:get_pos()
         elseif pos == 'there' then
             if not advmarkers.last_coords then
-                return false, 'No-one has used .coords yet!'
+                return false, 'No-one has used ".coords" and you have not died!'
             end
             pos = advmarkers.last_coords
         else
@@ -300,7 +300,7 @@ minetest.register_chatcommand('mrkrthere', {
     description = 'Adds a (temporary) marker at the last ".coords" position.',
     func = function(param)
         if not advmarkers.last_coords then
-            return false, 'No-one has used ".coords" yet!'
+            return false, 'No-one has used ".coords" and you have not died!'
         elseif not advmarkers.set_hud_pos(advmarkers.last_coords) then
             return false, 'Error setting the marker!'
         end
