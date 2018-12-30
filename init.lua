@@ -170,6 +170,7 @@ minetest.register_chatcommand('add_mrkr', {
     description = 'Adds a marker.',
     func = function(param)
         local s, e = param:find(' ')
+        if not s or not e then return end
         local pos  = param:sub(1, s - 1)
         local name = param:sub(e + 1)
 
