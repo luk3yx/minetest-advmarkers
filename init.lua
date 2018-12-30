@@ -238,8 +238,8 @@ minetest.register_on_formspec_input(function(formname, fields)
             end
         elseif fields.rename then
             minetest.show_formspec('advmarkers-csm', 'size[6,3]' ..
-                'label[0.35,0.25;Rename marker]' ..
-                'field[0.25,1.5;6,1;new_name;New name;' ..
+                'label[0.35,0.2;Rename marker]' ..
+                'field[0.3,1.3;6,1;new_name;New name;' ..
                 minetest.formspec_escape(name) .. ']' ..
                 'button[0,2;3,1;cancel;Cancel]' ..
                 'button[3,2;3,1;rename_confirm;Rename]')
@@ -257,14 +257,14 @@ minetest.register_on_formspec_input(function(formname, fields)
                 )
             end
         elseif fields.teleport then
-            minetest.show_formspec('advmarkers-csm', 'size[6,3]' ..
+            minetest.show_formspec('advmarkers-csm', 'size[6,2.2]' ..
                 'label[0.35,0.25;' .. minetest.formspec_escape(
                     'Teleport to a marker\n - ' .. name
                 ) .. ']' ..
-                'button[0,2;2,1;cancel;Cancel]' ..
-                'button_exit[2,2;1,1;teleport_tpj;/tpj]' ..
-                'button_exit[3,2;1,1;teleport_tpc;/tpc]' ..
-                'button_exit[4,2;2,1;teleport_confirm;/teleport]')
+                'button[0,1.25;2,1;cancel;Cancel]' ..
+                'button_exit[2,1.25;1,1;teleport_tpj;/tpj]' ..
+                'button_exit[3,1.25;1,1;teleport_tpc;/tpc]' ..
+                'button_exit[4,1.25;2,1;teleport_confirm;/teleport]')
         elseif fields.teleport_tpj then
             -- Teleport with /tpj
             local pos = advmarkers.get_marker(name)
