@@ -62,6 +62,49 @@ function advmarkers.display_marker(name)
     return advmarkers.set_hud_pos(advmarkers.get_marker(name))
 end
 
+-- Export markers
+function advmarkers.export(raw)
+    local s = storage:to_table().fields
+    if not raw then
+        s = minetest.compress(minetest.serialize(s))
+        s = 'M' .. minetest.encode_base64(s)
+    end
+    return s
+end
+
+-- Import markers
+function advmarkers.import(s)
+    if type(s) ~= 'table' then
+        if s:sub(1, 1) ~= 'M' then return false, 'No M' end
+        s = minetest.decode_base64(s:sub(2))
+        local success, msg = pcall(minetest.decompress, s)
+        if not success then return end
+        s = minetest.deserialize(msg)
+    end
+
+    -- Iterate over markers to preserve existing ones and check for errors.
+    if type(s) == 'table' then
+        for name, pos in pairs(s) do
+            if type(name) == 'string' and type(pos) == 'string' and
+              name:sub(1, 7) == 'marker-' and minetest.string_to_pos(pos) and
+              storage:get_string(name) ~= pos then
+                -- Prevent collisions
+                local c = 0
+                while #storage:get_string(name) > 0 and c < 50 do
+                    name = name .. '_'
+                    c = c + 1
+                end
+
+                -- Sanity check
+                if c < 50 then
+                    storage:set_string(name, pos)
+                end
+            end
+        end
+        return true
+    end
+end
+
 -- Get the markers formspec
 local formspec_list = {}
 local selected_name = false
@@ -156,7 +199,11 @@ minetest.register_chatcommand('add_mrkr', {
 
 -- Set the HUD
 minetest.register_on_formspec_input(function(formname, fields)
-    if formname ~= 'advmarkers-csm' then return end
+    if formname == 'advmarkers-ignore' then
+        return true
+    elseif formname ~= 'advmarkers-csm' then
+        return
+    end
     local name = false
     if fields.marker then
         local event = minetest.explode_textlist_event(fields.marker)
@@ -193,7 +240,7 @@ minetest.register_on_formspec_input(function(formname, fields)
     return true
 end)
 
--- Add a marker on death
+-- Auto-add markers on death.
 minetest.register_on_death(function()
     if minetest.localplayer then
         local name = os.date('Death on %Y-%m-%d %H:%M:%S')
@@ -201,3 +248,28 @@ minetest.register_on_death(function()
         minetest.display_chat_message('Added marker "' .. name .. '".')
     end
 end)
+
+-- Allow string exporting
+minetest.register_chatcommand('mrkr_export', {
+    params      = '',
+    description = 'Exports an advmarkers string containing all your markers.',
+    func = function(param)
+        minetest.show_formspec('advmarkers-ignore',
+            'field[_;Your marker export string;' ..
+            minetest.formspec_escape(advmarkers.export()) .. ']')
+    end
+})
+
+-- String importing
+minetest.register_chatcommand('mrkr_import', {
+    params      = '<advmarkers string>',
+    description = 'Imports an advmarkers string. This will not overwrite ' ..
+        'existing markers that have the same name.',
+    func = function(param)
+        if advmarkers.import(param) then
+            return true, 'Markers imported!'
+        else
+            return false, 'Invalid advmarkers string!'
+        end
+    end
+})
