@@ -166,11 +166,13 @@ minetest.register_chatcommand('mrkr', {
 
 -- Add a marker
 minetest.register_chatcommand('add_mrkr', {
-    params      = '<pos / "here"> <name>',
+    params      = '<pos / "here" / "there"> <name>',
     description = 'Adds a marker.',
     func = function(param)
         local s, e = param:find(' ')
-        if not s or not e then return end
+        if not s or not e then
+            return false, 'Invalid syntax! See .help add_mrkr for more info.'
+        end
         local pos  = param:sub(1, s - 1)
         local name = param:sub(e + 1)
 
