@@ -57,6 +57,17 @@ function advmarkers.get_marker(name)
     return string_to_pos(storage:get_string('marker-' .. tostring(name)))
 end
 
+-- Rename a marker and re-interpret the position.
+function advmarkers.rename_marker(oldname, newname)
+    oldname, newname = tostring(oldname), tostring(newname)
+    local pos = advmarkers.get_marker(oldname)
+    if not pos or not advmarkers.set_marker(pos, newname) then return end
+    if oldname ~= newname then
+        advmarkers.delete_marker(oldname)
+    end
+    return true
+end
+
 -- Display a marker
 function advmarkers.display_marker(name)
     return advmarkers.set_hud_pos(advmarkers.get_marker(name))
@@ -111,8 +122,10 @@ local selected_name = false
 function advmarkers.display_formspec()
     local formspec = 'size[5.25,8]' ..
                      'label[0,0;Marker list]' ..
-                     'button_exit[0,7.5;2.625,0.5;display;Display]' ..
-                     'button[2.625,7.5;2.625,0.5;delete;Delete]' ..
+                     'button_exit[0,7.5;1.3125,0.5;display;Display]' ..
+                     'button[1.3125,7.5;1.3125,0.5;teleport;Teleport]' ..
+                     'button[2.625,7.5;1.3125,0.5;rename;Rename]' ..
+                     'button[3.9375,7.5;1.3125,0.5;delete;Delete]' ..
                      'textlist[0,0.75;5,6;marker;'
 
     -- Iterate over all the markers
@@ -222,6 +235,63 @@ minetest.register_on_formspec_input(function(formname, fields)
         if fields.display then
             if not advmarkers.display_marker(name) then
                 minetest.display_chat_message('Error displaying marker!')
+            end
+        elseif fields.rename then
+            minetest.show_formspec('advmarkers-csm', 'size[6,3]' ..
+                'label[0.35,0.25;Rename marker]' ..
+                'field[0.25,1.5;6,1;new_name;New name;' ..
+                minetest.formspec_escape(name) .. ']' ..
+                'button[0,2;3,1;cancel;Cancel]' ..
+                'button[3,2;3,1;rename_confirm;Rename]')
+        elseif fields.rename_confirm then
+            if fields.new_name and #fields.new_name > 0 then
+                if advmarkers.rename_marker(name, fields.new_name) then
+                    selected_name = fields.new_name
+                else
+                    minetest.display_chat_message('Error renaming marker!')
+                end
+                advmarkers.display_formspec()
+            else
+                minetest.display_chat_message(
+                    'Please enter a new name for the marker.'
+                )
+            end
+        elseif fields.teleport then
+            minetest.show_formspec('advmarkers-csm', 'size[6,3]' ..
+                'label[0.35,0.25;' .. minetest.formspec_escape(
+                    'Teleport to a marker\n - ' .. name
+                ) .. ']' ..
+                'button[0,2;2,1;cancel;Cancel]' ..
+                'button_exit[2,2;1,1;teleport_tpj;/tpj]' ..
+                'button_exit[3,2;1,1;teleport_tpc;/tpc]' ..
+                'button_exit[4,2;2,1;teleport_confirm;/teleport]')
+        elseif fields.teleport_tpj then
+            -- Teleport with /tpj
+            local pos = advmarkers.get_marker(name)
+            if pos and minetest.localplayer then
+                local cpos = minetest.localplayer:get_pos()
+                for _, dir in ipairs({'x', 'y', 'z'}) do
+                    local distance = pos[dir] - cpos[dir]
+                    minetest.run_server_chatcommand('tpj', dir .. ' ' ..
+                        tostring(distance))
+                end
+            else
+                minetest.display_chat_message('Error teleporting to marker!')
+            end
+        elseif fields.teleport_confirm or fields.teleport_tpc then
+            -- Teleport with /teleport
+            local pos = advmarkers.get_marker(name)
+            local cmd
+            if fields.teleport_confirm then
+                cmd = 'teleport'
+            else
+                cmd = 'tpc'
+            end
+            if pos and minetest.localplayer then
+                minetest.run_server_chatcommand(cmd,
+                    pos.x .. ',' .. pos.y .. ',' .. pos.z)
+            else
+                minetest.display_chat_message('Error teleporting to marker!')
             end
         elseif fields.delete then
             minetest.show_formspec('advmarkers-csm', 'size[6,2]' ..
