@@ -76,9 +76,12 @@ end
 -- Export markers
 function advmarkers.export(raw)
     local s = storage:to_table().fields
-    if not raw then
+    if raw == 'M' then
         s = minetest.compress(minetest.serialize(s))
         s = 'M' .. minetest.encode_base64(s)
+    elseif not raw then
+        s = minetest.compress(minetest.write_json(s))
+        s = 'J' .. minetest.encode_base64(s)
     end
     return s
 end
@@ -86,11 +89,16 @@ end
 -- Import markers
 function advmarkers.import(s)
     if type(s) ~= 'table' then
-        if s:sub(1, 1) ~= 'M' then return false, 'No M' end
+        local ver = s:sub(1, 1)
+        if ver ~= 'M' and ver ~= 'J' then return end
         s = minetest.decode_base64(s:sub(2))
         local success, msg = pcall(minetest.decompress, s)
         if not success then return end
-        s = minetest.deserialize(msg)
+        if ver == 'M' then
+            s = minetest.deserialize(msg)
+        else
+            s = minetest.parse_json(msg)
+        end
     end
 
     -- Iterate over markers to preserve existing ones and check for errors.
@@ -327,12 +335,18 @@ end)
 
 -- Allow string exporting
 minetest.register_chatcommand('mrkr_export', {
-    params      = '',
+    params      = '[old]',
     description = 'Exports an advmarkers string containing all your markers.',
     func = function(param)
+        local export
+        if param == 'old' then
+            export = advmarkers.export('M')
+        else
+            export = advmarkers.export()
+        end
         minetest.show_formspec('advmarkers-ignore',
             'field[_;Your marker export string;' ..
-            minetest.formspec_escape(advmarkers.export()) .. ']')
+            minetest.formspec_escape(export) .. ']')
     end
 })
 
