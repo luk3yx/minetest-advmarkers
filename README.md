@@ -1,7 +1,5 @@
 # advmarkers (non-CSM)
 
-# Do not release yet, still WIP
-
 A marker/waypoint mod for Minetest.
 
 Unlike the [CSM], this mod does not require the [markers] mod to be installed.
