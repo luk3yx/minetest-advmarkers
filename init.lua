@@ -443,8 +443,12 @@ minetest.register_chatcommand('mrkr_import', {
 
 -- Chat channels .coords integration.
 -- You do not need to have chat channels installed for this to work.
-local function get_coords(msg)
-    local s, e = msg:find('Current Position: %-?[0-9]+, %-?[0-9]+, %-?[0-9]+%.')
+local function get_coords(msg, strict)
+    local s = 'Current Position: %-?[0-9]+, %-?[0-9]+, %-?[0-9]+%.'
+    if strict then
+        s = '^' .. s
+    end
+    local s, e = msg:find(s)
     local pos = false
     if s and e then
         pos = string_to_pos(msg:sub(s + 18, e - 1))
@@ -454,7 +458,8 @@ end
 
 -- Get global co-ords
 table.insert(minetest.registered_on_chat_messages, 1, function(name, msg)
-    local pos = get_coords(msg)
+    if msg:sub(1, 1) == '/' then return end
+    local pos = get_coords(msg, true)
     if pos then
         advmarkers.last_coords = {}
         for _, player in ipairs(get_connected_players()) do
