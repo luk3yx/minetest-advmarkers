@@ -2,7 +2,7 @@
 
 A marker/waypoint mod for Minetest.
 
-Unlike the [CSM], this mod is standalone, and conflicts with the [marker] mod.
+Unlike the [CSM], this mod is standalone, and conflicts with the marker mod.
 
 ## How to use
 
@@ -25,7 +25,6 @@ advmarkers temporarily stores this position, and you can set a temporary marker
 at the `.coords` position with `/mrkrthere`, or add a permanent marker with
 `/add_mrkr there Marker name`.
 
-[CSM]:    https://gitlab.com/luk3yx/minetest-advmarkers-csm
-[marker]: https://github.com/Billy-S/kingdoms_game/blob/master/mods/marker
+[CSM]:    https://git.minetest.land/luk3yx/advmarkers-csm
 [GitHub]: https://github.com/luk3yx/minetest-chat_channels
 [GitLab]: https://gitlab.com/luk3yx/minetest-chat_channels
