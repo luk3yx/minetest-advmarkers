@@ -25,6 +25,12 @@ advmarkers temporarily stores this position, and you can set a temporary marker
 at the `.coords` position with `/mrkrthere`, or add a permanent marker with
 `/add_mrkr there Marker name`.
 
+## SSCSM support
+
+With my [SSCSM] mod installed, advmarkers will register a server-sent CSM to
+reduce visible lag in the markers GUI.
+
 [CSM]:    https://git.minetest.land/luk3yx/advmarkers-csm
 [GitHub]: https://github.com/luk3yx/minetest-chat_channels
 [GitLab]: https://gitlab.com/luk3yx/minetest-chat_channels
+[SSCSM]:  https://git.minetest.land/luk3yx/sscsm

@@ -286,11 +286,41 @@ local function register_chatcommand_alias(old, ...)
 end
 
 -- Open the waypoints GUI
+local csm_key = string.char(1) .. 'ADVMARKERS_SSCSM' .. string.char(1)
 minetest.register_chatcommand('mrkr', {
     params      = '',
     description = 'Open the advmarkers GUI',
     func = function(pname, param)
-        if #param:gsub(' ', '') > 0 then
+        if param:sub(1, #csm_key) == csm_key then
+            -- SSCSM communication
+            param = param:sub(#csm_key + 1)
+            local cmd = param:sub(1, 1)
+
+            if cmd == 'D' then
+                -- D: Delete
+                advmarkers.delete_waypoint(pname, param:sub(2))
+            elseif cmd == 'S' then
+                -- S: Set
+                local s, e = param:find(' ')
+                if s and e then
+                    local pos = string_to_pos(param:sub(2, s - 1))
+                    if pos then
+                        advmarkers.set_waypoint(pname, pos, param:sub(e + 1))
+                    end
+                end
+            elseif cmd == '0' then
+                -- 0: Display
+                if not advmarkers.display_waypoint(pname, param:sub(2)) then
+                    minetest.chat_send_player(pname,
+                        'Error displaying waypoint!')
+                end
+            end
+
+            minetest.chat_send_player(pname, csm_key
+                .. advmarkers.export(pname))
+        elseif param == '' then
+            advmarkers.display_formspec(pname)
+        else
             local pos, err = advmarkers.get_chatcommand_pos(pname, param)
             if not pos then
                 return false, err
@@ -298,8 +328,6 @@ minetest.register_chatcommand('mrkr', {
             if not advmarkers.set_hud_pos(pname, pos) then
                 return false, 'Error setting the waypoint!'
             end
-        else
-            advmarkers.display_formspec(pname)
         end
     end
 })
@@ -529,3 +557,11 @@ minetest.register_chatcommand('mrkrthere', {
         return minetest.registered_chatcommands['mrkr'].func(name, 'there')
     end
 })
+
+-- SSCSM support
+if minetest.global_exists('sscsm') and sscsm.register then
+    sscsm.register({
+        name = 'advmarkers',
+        file = minetest.get_modpath('advmarkers') .. '/sscsm.lua',
+    })
+end
