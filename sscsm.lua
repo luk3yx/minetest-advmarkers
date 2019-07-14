@@ -224,7 +224,7 @@ minetest.register_on_formspec_input(function(formname, fields)
             end
         elseif fields.rename then
             minetest.show_formspec('advmarkers-sscsm', 'size[6,3]' ..
-                'label[0.35,0.2;Rename marker]' ..
+                'label[0.35,0.2;Rename waypoint]' ..
                 'field[0.3,1.3;6,1;new_name;New name;' ..
                 minetest.formspec_escape(name) .. ']' ..
                 'button[0,2;3,1;cancel;Cancel]' ..
