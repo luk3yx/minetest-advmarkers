@@ -5,7 +5,7 @@
 --
 
 advmarkers = {
-    dated_death_markers = true
+    dated_death_markers = false
 }
 
 -- Get the mod storage
