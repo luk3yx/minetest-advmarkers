@@ -5,6 +5,9 @@
 advmarkers = {}
 local data = {}
 
+assert(not sscsm.restrictions or not sscsm.restrictions.chat_messages,
+    'The advmarkers SSCSM needs to be able to send chat messages!')
+
 -- Convert positions to/from strings
 local function pos_to_string(pos)
     if type(pos) == 'table' then
