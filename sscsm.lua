@@ -1,6 +1,9 @@
 --
 -- Minetest advmarkers SSCSM
 --
+-- Copyright © 2019 by luk3yx
+-- License: https://git.minetest.land/luk3yx/advmarkers/src/branch/master/LICENSE.md
+--
 
 advmarkers = {}
 local data = {}

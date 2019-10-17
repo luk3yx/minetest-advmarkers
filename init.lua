@@ -1,7 +1,7 @@
 --
 -- Minetest advmarkers mod
 --
--- The advmarkers CSM ported to a server-side mod
+-- © 2019 by luk3yx
 --
 
 advmarkers = {
