@@ -66,11 +66,11 @@ function advmarkers.set_hud_pos(player, pos, title)
     if not title then
         title = pos.x .. ', ' .. pos.y .. ', ' .. pos.z
     end
-    if hud[player] then
-        player:hud_change(hud[player], 'name',      title)
-        player:hud_change(hud[player], 'world_pos', pos)
+    if hud[name] then
+        player:hud_change(hud[name], 'name',      title)
+        player:hud_change(hud[name], 'world_pos', pos)
     else
-        hud[player] = player:hud_add({
+        hud[name] = player:hud_add({
             hud_elem_type = 'waypoint',
             name          = title,
             text          = 'm',
@@ -78,7 +78,8 @@ function advmarkers.set_hud_pos(player, pos, title)
             world_pos     = pos
         })
     end
-    minetest.chat_send_player(name, 'Waypoint set to ' .. title)
+    minetest.chat_send_player(name, 'Waypoint set to ' ..
+        minetest.colorize('#bf360c', title))
     return true
 end
 
@@ -542,11 +543,11 @@ end
 
 -- Clean up variables if a player leaves
 minetest.register_on_leaveplayer(function(player)
-    local name = get_player(player, 0)
-    hud[name]                       = nil
-    formspec_list[name]             = nil
-    selected_name[name]             = nil
-    advmarkers.last_coords[name]    = nil
+    local name = player:get_player_name()
+    hud[name] = nil
+    formspec_list[name] = nil
+    selected_name[name] = nil
+    advmarkers.last_coords[name] = nil
 end)
 
 -- Add '/mrkrthere'
@@ -557,6 +558,23 @@ minetest.register_chatcommand('mrkrthere', {
         return minetest.registered_chatcommands['mrkr'].func(name, 'there')
     end
 })
+
+minetest.register_chatcommand('clrmrkr', {
+    params = '',
+    description = 'Hides the displayed waypoint.',
+    func = function(name, param)
+        local player = minetest.get_player_by_name(name)
+        if not hud[name] or not player then
+            return false, 'No waypoint is currently being displayed!' .. dump(hud)
+        end
+        player:hud_remove(hud[name])
+        hud[name] = nil
+        return true, 'Hidden the currently displayed waypoint.'
+    end,
+})
+
+register_chatcommand_alias('clrmrkr', 'clear_marker', 'clrwp',
+    'clear_waypoint')
 
 -- SSCSM support
 if minetest.global_exists('sscsm') and sscsm.register then
