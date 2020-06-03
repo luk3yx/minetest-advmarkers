@@ -240,6 +240,6 @@ end)
 
 -- Update the waypoint list
 sscsm.register_on_com_receive('advmarkers:update', function(msg)
-    data = msg
+    data = msg or {}
     loaded = true
 end)
