@@ -11,6 +11,7 @@ advmarkers = {
 -- Get the mod storage
 local storage = minetest.get_mod_storage()
 local hud = {}
+local use_sscsm = false
 advmarkers.last_coords = {}
 
 -- Convert positions to/from strings
@@ -91,15 +92,17 @@ end
 
 local function save_storage(name, data)
     name = get_player(name, 0)
-    if type(data) == 'table' then
-        data = minetest.serialize(data)
-    end
-    if type(data) ~= 'string' then return end
-    if #data > 0 then
-        storage:set_string(name, data)
+    assert(type(data) == 'table')
+    if next(data) then
+        storage:set_string(name, minetest.serialize(data))
     else
         storage:set_string(name, '')
     end
+
+    if use_sscsm and sscsm.has_sscsms_enabled(name) then
+        sscsm.com_send(name, 'advmarkers:update', data)
+    end
+
     return true
 end
 
@@ -287,39 +290,11 @@ local function register_chatcommand_alias(old, ...)
 end
 
 -- Open the waypoints GUI
-local csm_key = string.char(1) .. 'ADVMARKERS_SSCSM' .. string.char(1)
 minetest.register_chatcommand('mrkr', {
     params      = '',
     description = 'Open the advmarkers GUI',
     func = function(pname, param)
-        if param:sub(1, #csm_key) == csm_key then
-            -- SSCSM communication
-            param = param:sub(#csm_key + 1)
-            local cmd = param:sub(1, 1)
-
-            if cmd == 'D' then
-                -- D: Delete
-                advmarkers.delete_waypoint(pname, param:sub(2))
-            elseif cmd == 'S' then
-                -- S: Set
-                local s, e = param:find(' ')
-                if s and e then
-                    local pos = string_to_pos(param:sub(2, s - 1))
-                    if pos then
-                        advmarkers.set_waypoint(pname, pos, param:sub(e + 1))
-                    end
-                end
-            elseif cmd == '0' then
-                -- 0: Display
-                if not advmarkers.display_waypoint(pname, param:sub(2)) then
-                    minetest.chat_send_player(pname,
-                        'Error displaying waypoint!')
-                end
-            end
-
-            minetest.chat_send_player(pname, csm_key
-                .. advmarkers.export(pname))
-        elseif param == '' then
+        if param == '' then
             advmarkers.display_formspec(pname)
         else
             local pos, err = advmarkers.get_chatcommand_pos(pname, param)
@@ -577,9 +552,50 @@ register_chatcommand_alias('clrmrkr', 'clear_marker', 'clrwp',
     'clear_waypoint')
 
 -- SSCSM support
-if minetest.global_exists('sscsm') and sscsm.register then
-    sscsm.register({
-        name = 'advmarkers',
-        file = minetest.get_modpath('advmarkers') .. '/sscsm.lua',
-    })
+if not minetest.global_exists('sscsm') or not sscsm.register then
+    return
 end
+
+if not sscsm.register_on_com_receive then
+    minetest.log('warning', '[advmarkers] The SSCSM mod is outdated!')
+    return
+end
+
+use_sscsm = true
+sscsm.register({
+    name = 'advmarkers',
+    file = minetest.get_modpath('advmarkers') .. '/sscsm.lua',
+})
+
+-- SSCSM communication
+-- TODO: Make this use a table (or multiple channels).
+sscsm.register_on_com_receive('advmarkers:cmd', function(name, param)
+    if type(param) ~= 'string' then
+        return
+    end
+
+    local cmd = param:sub(1, 1)
+    if cmd == 'D' then
+        -- D: Delete
+        advmarkers.delete_waypoint(name, param:sub(2))
+    elseif cmd == 'S' then
+        -- S: Set
+        local s, e = param:find(' ', nil, true)
+        if s and e then
+            local pos = string_to_pos(param:sub(2, s - 1))
+            if pos then
+                advmarkers.set_waypoint(name, pos, param:sub(e + 1))
+            end
+        end
+    elseif cmd == '0' then
+        -- 0: Display
+        if not advmarkers.display_waypoint(name, param:sub(2)) then
+            minetest.chat_send_player(name, 'Error displaying waypoint!')
+        end
+    end
+end)
+
+-- Send waypoint list once SSCSMs are loaded.
+sscsm.register_on_sscsms_loaded(function(name)
+    sscsm.com_send(name, 'advmarkers:update', get_storage(name))
+end)

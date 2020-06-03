@@ -7,6 +7,7 @@
 
 advmarkers = {}
 local data = {}
+local loaded = false
 
 assert(not sscsm.restrictions or not sscsm.restrictions.chat_messages,
     'The advmarkers SSCSM needs to be able to send chat messages!')
@@ -33,14 +34,8 @@ end
 -- Run remote command
 -- This is easier to do with chatcommands because servers cannot send mod
 --  channel messages to specific clients.
-local csm_key = string.char(1) .. 'ADVMARKERS_SSCSM' .. string.char(1)
 local function run_remote_command(cmd, param)
-    local msg = csm_key
-    if cmd then
-        msg = msg .. cmd
-        if param then msg = msg .. param end
-    end
-    minetest.run_server_chatcommand('wp', msg)
+    sscsm.com_send('advmarkers:cmd', cmd .. (param or ''))
 end
 
 -- Display a waypoint
@@ -93,43 +88,10 @@ function advmarkers.rename_waypoint(oldname, newname)
 end
 advmarkers.rename_marker = advmarkers.rename_waypoint
 
--- Import waypoints - Note that this won't import strings made by older
---  versions of the CSM.
-function advmarkers.import(s, clear)
-    if type(s) ~= 'table' then
-        if s:sub(1, 1) ~= 'J' then return end
-        s = minetest.decode_base64(s:sub(2))
-        local success, msg = pcall(minetest.decompress, s)
-        if not success then return end
-        s = minetest.parse_json(msg)
-    end
-
-    -- Iterate over waypoints to preserve existing ones and check for errors.
-    if type(s) ~= 'table' then return end
-    if clear then data = {} end
-    for name, pos in pairs(s) do
-        if type(name) == 'string' and type(pos) == 'string' and
-                name:sub(1, 7) == 'marker-' and minetest.string_to_pos(pos) and
-                data[name] ~= pos then
-            -- Prevent collisions
-            local c = 0
-            while data[name] and c < 50 do
-                name = name .. '_'
-                c = c + 1
-            end
-
-            -- Sanity check
-            if c < 50 then
-                data[name] = pos
-            end
-        end
-    end
-end
-
 -- Get waypoint names
 function advmarkers.get_waypoint_names(sorted)
     local res = {}
-    for name, pos in pairs(data) do
+    for name, _ in pairs(data) do
         if name:sub(1, 7) == 'marker-' then
             table.insert(res, name:sub(8))
         end
@@ -142,6 +104,11 @@ end
 local formspec_list = {}
 local selected_name = false
 function advmarkers.display_formspec()
+    if not loaded then
+        minetest.run_server_chatcommand('wp')
+        return
+    end
+
     local formspec = 'size[5.25,8]' ..
                      'label[0,0;Waypoint list ' ..
                         minetest.colorize('#888888', '(SSCSM)') .. ']' ..
@@ -152,7 +119,6 @@ function advmarkers.display_formspec()
                      'textlist[0,0.75;5,6;marker;'
 
     -- Iterate over all the markers
-    local id = 0
     local selected = 1
     formspec_list = advmarkers.get_waypoint_names()
     for id, name in ipairs(formspec_list) do
@@ -183,10 +149,8 @@ function advmarkers.display_formspec()
 end
 
 -- Register chatcommands
-local mrkr_cmd
-function mrkr_cmd(param)
+local function mrkr_cmd(param)
     if param == '' then return advmarkers.display_formspec() end
-    if param == '--ssm' then param = '' end
     minetest.run_server_chatcommand('wp', param)
 end
 sscsm.register_chatcommand('mrkr', mrkr_cmd)
@@ -194,17 +158,6 @@ sscsm.register_chatcommand('wp', mrkr_cmd)
 sscsm.register_chatcommand('wps', mrkr_cmd)
 sscsm.register_chatcommand('waypoint', mrkr_cmd)
 sscsm.register_chatcommand('waypoints', mrkr_cmd)
-
-function mrkr_cmd(param)
-    minetest.run_server_chatcommand('add_wp', param)
-    run_remote_command()
-end
-
-sscsm.register_chatcommand('add_wp', mrkr_cmd)
-sscsm.register_chatcommand('add_waypoint', mrkr_cmd)
-sscsm.register_chatcommand('add_mrkr', mrkr_cmd)
-
-mrkr_cmd = nil
 
 -- Set the HUD
 minetest.register_on_formspec_input(function(formname, fields)
@@ -266,7 +219,7 @@ minetest.register_on_formspec_input(function(formname, fields)
             end
         elseif fields.delete then
             minetest.show_formspec('advmarkers-sscsm', 'size[6,2]' ..
-                'label[0.35,0.25;Are you sure you want to delete this marker?]' ..
+                'label[0.35,0.25;Are you sure you want to delete this waypoint?]' ..
                 'button[0,1;3,1;cancel;Cancel]' ..
                 'button[3,1;3,1;delete_confirm;Delete]')
         elseif fields.delete_confirm then
@@ -280,17 +233,13 @@ minetest.register_on_formspec_input(function(formname, fields)
             advmarkers.display_formspec()
         end
     elseif fields.display or fields.delete then
-        minetest.display_chat_message('Please select a marker.')
+        minetest.display_chat_message('Please select a waypoint.')
     end
     return true
 end)
 
 -- Update the waypoint list
-minetest.register_on_receiving_chat_message(function(message)
-    if message:sub(1, #csm_key) == csm_key then
-        advmarkers.import(message:sub(#csm_key + 1), true)
-        return true
-    end
+sscsm.register_on_com_receive('advmarkers:update', function(msg)
+    data = msg
+    loaded = true
 end)
-
-run_remote_command()
