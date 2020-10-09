@@ -12,16 +12,6 @@ local loaded = false
 assert(not sscsm.restrictions or not sscsm.restrictions.chat_messages,
     'The advmarkers SSCSM needs to be able to send chat messages!')
 
--- Convert positions to/from strings
-local function pos_to_string(pos)
-    if type(pos) == 'table' then
-        pos = minetest.pos_to_string(vector.round(pos))
-    end
-    if type(pos) == 'string' then
-        return pos
-    end
-end
-
 local function string_to_pos(pos)
     if type(pos) == 'string' then
         pos = minetest.string_to_pos(pos)
@@ -32,34 +22,30 @@ local function string_to_pos(pos)
 end
 
 -- Run remote command
--- This is easier to do with chatcommands because servers cannot send mod
---  channel messages to specific clients.
+-- TODO: Use separate SSCSM com channels
 local function run_remote_command(cmd, param)
     sscsm.com_send('advmarkers:cmd', cmd .. (param or ''))
 end
 
 -- Display a waypoint
 function advmarkers.display_waypoint(name)
-    name = tostring(name)
-    if data['marker-' .. name] then
-        run_remote_command('0', tostring(name))
+    if data[name] then
+        run_remote_command('0', name)
         return true
-    else
-        return false
     end
+    return false
 end
 
 -- Get a waypoint
 function advmarkers.get_waypoint(name)
-    return string_to_pos(data['marker-' .. tostring(name)])
+    return data[name]
 end
 advmarkers.get_marker = advmarkers.get_waypoint
 
 -- Delete a waypoint
 function advmarkers.delete_waypoint(name)
-    name = tostring(name)
-    if data['marker-' .. name] ~= nil then
-        data['marker-' .. name] = nil
+    if data[name] ~= nil then
+        data[name] = nil
         run_remote_command('D', name)
     end
 end
@@ -67,11 +53,12 @@ advmarkers.delete_marker = advmarkers.delete_waypoint
 
 -- Set a waypoint
 function advmarkers.set_waypoint(pos, name)
-    pos = pos_to_string(pos)
+    pos = string_to_pos(pos)
     if not pos then return end
     name = tostring(name)
-    data['marker-' .. name] = pos
-    run_remote_command('S', pos:gsub(' ', '') .. ' ' .. name)
+    data[name] = pos
+    run_remote_command('S', minetest.pos_to_string(pos):gsub(' ', '') ..
+        ' ' .. name)
     return true
 end
 advmarkers.set_marker = advmarkers.set_waypoint
@@ -92,9 +79,7 @@ advmarkers.rename_marker = advmarkers.rename_waypoint
 function advmarkers.get_waypoint_names(sorted)
     local res = {}
     for name, _ in pairs(data) do
-        if name:sub(1, 7) == 'marker-' then
-            table.insert(res, name:sub(8))
-        end
+        table.insert(res, name)
     end
     if sorted or sorted == nil then table.sort(res) end
     return res
@@ -140,7 +125,8 @@ function advmarkers.display_formspec()
         end
     else
         -- Draw over the buttons
-        formspec = formspec .. 'button_exit[0,7.5;5.25,0.5;quit;Close dialog]' ..
+        formspec = formspec ..
+            'button_exit[0,7.5;5.25,0.5;quit;Close dialog]' ..
             'label[0,6.75;No waypoints. Add one with "/add_wp".]'
     end
 
@@ -219,7 +205,8 @@ minetest.register_on_formspec_input(function(formname, fields)
             end
         elseif fields.delete then
             minetest.show_formspec('advmarkers-sscsm', 'size[6,2]' ..
-                'label[0.35,0.25;Are you sure you want to delete this waypoint?]' ..
+                'label[0.35,0.25;Are you sure you want to delete this ' ..
+                    'waypoint?]' ..
                 'button[0,1;3,1;cancel;Cancel]' ..
                 'button[3,1;3,1;delete_confirm;Delete]')
         elseif fields.delete_confirm then

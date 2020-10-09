@@ -33,7 +33,6 @@ local function string_to_pos(pos)
     end
 end
 
--- Get player name or object
 local get_player_by_name    = minetest.get_player_by_name
 local get_connected_players = minetest.get_connected_players
 if minetest.get_modpath('cloaking') then
@@ -41,29 +40,27 @@ if minetest.get_modpath('cloaking') then
     get_connected_players   = cloaking.get_connected_players
 end
 
-local function get_player(player, t)
-    local name
-    if type(player) == 'string' then
-        name = player
-        if t ~= 0 then
-            player = get_player_by_name(name)
+-- Adds compatibility alias and coerces the first argument to a player object
+local is_player = minetest.is_player
+local function add_compat_function(func_name)
+    local func = assert(advmarkers[func_name])
+    local function wrapper(player, ...)
+        if not is_player(player) then
+            player = get_player_by_name(player)
+            if not player then return end
         end
-    else
-        name = player:get_player_name()
+        return func(player, ...)
     end
-    if t == 0 then
-        return name
-    elseif t == 1 then
-        return player
-    end
-    return name, player
+
+    advmarkers[func_name] = wrapper
+    advmarkers[func_name:gsub('waypoint', 'marker')] = wrapper
 end
 
 -- Set the HUD position
 function advmarkers.set_hud_pos(player, pos, title)
-    local name, player = get_player(player)
+    local name = player:get_player_name()
     pos = string_to_pos(pos)
-    if not player or not pos then return end
+    if not pos then return end
     if not title then
         title = pos.x .. ', ' .. pos.y .. ', ' .. pos.z
     end
@@ -83,24 +80,44 @@ function advmarkers.set_hud_pos(player, pos, title)
         minetest.colorize('#bf360c', title))
     return true
 end
+add_compat_function('set_hud_pos')
 
 -- Get and save player storage
-local function get_storage(name)
-    name = get_player(name, 0)
-    return minetest.deserialize(storage:get_string(name)) or {}
+local function get_storage(player)
+    local raw = player:get_meta():get_string('advmarkers:waypoints') or ''
+    local version = raw:sub(1, 1)
+    if version == '0' then
+        -- Player meta: 0{"Marker name": {"x": 1, "y": 2, "z": 3}}
+        return minetest.parse_json(raw:sub(2))
+    elseif version == '' then
+        -- Mod storage: return {["marker-Marker name"] = "(1,2,3)"}
+        local pname = player:get_player_name()
+        local res = {}
+        raw = minetest.deserialize(storage:get_string(pname))
+        if raw then
+            for name, pos in pairs(raw) do
+                if name:sub(1, 7) == 'marker-' then
+                    res[name:sub(8)] = string_to_pos(pos)
+                end
+            end
+        end
+        return res
+    end
 end
 
-local function save_storage(name, data)
-    name = get_player(name, 0)
-    assert(type(data) == 'table')
-    if next(data) then
-        storage:set_string(name, minetest.serialize(data))
+local function save_storage(player, markers)
+    local name = player:get_player_name()
+    local meta = player:get_meta()
+    if next(markers) then
+        meta:set_string('advmarkers:waypoints', '0' ..
+            minetest.write_json(markers))
     else
-        storage:set_string(name, '')
+        meta:set_string('advmarkers:waypoints', '')
     end
+    storage:set_string(name, '')
 
     if use_sscsm and sscsm.has_sscsms_enabled(name) then
-        sscsm.com_send(name, 'advmarkers:update', data)
+        sscsm.com_send(name, 'advmarkers:update', markers)
     end
 
     return true
@@ -108,32 +125,28 @@ end
 
 -- Add a waypoint
 function advmarkers.set_waypoint(player, pos, name)
-    pos = pos_to_string(pos)
-    if not pos then return end
     local data = get_storage(player)
-    data['marker-' .. tostring(name)] = pos
+    data[tostring(name)] = string_to_pos(pos)
     return save_storage(player, data)
 end
-advmarkers.set_marker = advmarkers.set_waypoint
+add_compat_function('set_waypoint')
 
 -- Delete a waypoint
 function advmarkers.delete_waypoint(player, name)
     local data = get_storage(player)
-    data['marker-' .. tostring(name)] = nil
+    data[name] = nil
     return save_storage(player, data)
 end
-advmarkers.delete_marker = advmarkers.delete_waypoint
+add_compat_function('delete_waypoint')
 
 -- Get a waypoint
 function advmarkers.get_waypoint(player, name)
-    local data = get_storage(player)
-    return string_to_pos(data['marker-' .. tostring(name)])
+    return get_storage(player)[name]
 end
-advmarkers.get_marker = advmarkers.get_waypoint
+add_compat_function('get_waypoint')
 
--- Rename a waypoint and re-interpret the position.
+-- Rename a waypoint
 function advmarkers.rename_waypoint(player, oldname, newname)
-    player = get_player(player, 0)
     oldname, newname = tostring(oldname), tostring(newname)
     local pos = advmarkers.get_waypoint(player, oldname)
     if not pos or not advmarkers.set_waypoint(player, pos, newname) then
@@ -144,32 +157,34 @@ function advmarkers.rename_waypoint(player, oldname, newname)
     end
     return true
 end
-advmarkers.rename_marker = advmarkers.rename_waypoint
+add_compat_function('rename_waypoint')
 
 -- Get waypoint names
-function advmarkers.get_waypoint_names(name, sorted)
-    local data = get_storage(name)
+function advmarkers.get_waypoint_names(player, sorted)
+    local data = get_storage(player)
     local res = {}
-    for name, pos in pairs(data) do
-        if name:sub(1, 7) == 'marker-' then
-            table.insert(res, name:sub(8))
-        end
+    for name, _ in pairs(data) do
+        table.insert(res, name)
     end
     if sorted or sorted == nil then table.sort(res) end
     return res
 end
-advmarkers.get_marker_names = advmarkers.get_waypoint_names
+add_compat_function('get_waypoint_names')
 
 -- Display a waypoint
 function advmarkers.display_waypoint(player, name)
     return advmarkers.set_hud_pos(player, advmarkers.get_waypoint(player, name),
         name)
 end
-advmarkers.display_marker = advmarkers.display_waypoint
+add_compat_function('display_waypoint')
 
 -- Export waypoints
 function advmarkers.export(player, raw)
-    local s = get_storage(player)
+    local s = {}
+    for name, pos in pairs(get_storage(player)) do
+        s['marker-' .. name] = pos_to_string(pos)
+    end
+
     if raw == 'M' then
         s = minetest.compress(minetest.serialize(s))
         s = 'M' .. minetest.encode_base64(s)
@@ -179,6 +194,7 @@ function advmarkers.export(player, raw)
     end
     return s
 end
+add_compat_function('export')
 
 -- Import waypoints - Note that this won't import strings made by older
 --  versions of the CSM.
@@ -189,38 +205,41 @@ function advmarkers.import(player, s)
         local success, msg = pcall(minetest.decompress, s)
         if not success then return end
         s = minetest.parse_json(msg)
+        if type(s) ~= 'table' then return end
     end
 
-    -- Iterate over waypoints to preserve existing ones and check for errors.
-    if type(s) == 'table' then
-        local data = get_storage(player)
-        for name, pos in pairs(s) do
-            if type(name) == 'string' and type(pos) == 'string' and
-              name:sub(1, 7) == 'marker-' and minetest.string_to_pos(pos) and
-              data[name] ~= pos then
+    -- Parse the exported table
+    local data = get_storage(player)
+    for field, pos in pairs(s) do
+        if type(field) == 'string' and type(pos) == 'string' and
+                field:sub(1, 7) == 'marker-' then
+            pos = string_to_pos(pos)
+            if pos then
                 -- Prevent collisions
+                local name = field:sub(8)
                 local c = 0
-                while data[name] and c < 50 do
+                while data[name] and not vector.equals(data[name], pos) and
+                        c < 50 do
                     name = name .. '_'
                     c = c + 1
                 end
 
                 -- Sanity check
                 if c < 50 then
-                    data[name] = pos
+                    data[name] = string_to_pos(pos)
                 end
             end
         end
-        return save_storage(player, data)
     end
+    return save_storage(player, data)
 end
+add_compat_function('import')
 
 -- Get the waypoints formspec
 local formspec_list = {}
 local selected_name = {}
 function advmarkers.display_formspec(player)
-    player = get_player(player, 0)
-    if not get_player_by_name(player) then return end
+    local pname = player:get_player_name()
     local formspec = 'size[5.25,8]' ..
                      'label[0,0;Waypoint list]' ..
                      'button_exit[0,7.5;1.3125,0.5;display;Display]' ..
@@ -231,42 +250,42 @@ function advmarkers.display_formspec(player)
 
     -- Iterate over all the waypoints
     local selected = 1
-    formspec_list[player] = advmarkers.get_waypoint_names(player)
+    formspec_list[pname] = advmarkers.get_waypoint_names(player)
 
-    for id, name in ipairs(formspec_list[player]) do
+    for id, name in ipairs(formspec_list[pname]) do
         if id > 1 then formspec = formspec .. ',' end
-        if not selected_name[player] then selected_name[player] = name end
-        if name == selected_name[player] then selected = id end
+        if not selected_name[pname] then selected_name[pname] = name end
+        if name == selected_name[pname] then selected = id end
         formspec = formspec .. '##' .. minetest.formspec_escape(name)
     end
 
     -- Close the text list and display the selected waypoint position
     formspec = formspec .. ';' .. tostring(selected) .. ']'
-    if selected_name[player] then
-        local pos = advmarkers.get_waypoint(player, selected_name[player])
-        if pos then
-            pos = minetest.formspec_escape(tostring(pos.x) .. ', ' ..
-            tostring(pos.y) .. ', ' .. tostring(pos.z))
-            pos = 'Waypoint position: ' .. pos
-            formspec = formspec .. 'label[0,6.75;' .. pos .. ']'
-        end
+    local pos = selected_name[pname] and
+            advmarkers.get_waypoint(player, selected_name[pname])
+    if pos then
+        formspec = formspec .. 'label[0,6.75;Waypoint position: ' ..
+            minetest.formspec_escape(tostring(pos.x) .. ', ' ..
+            tostring(pos.y) .. ', ' .. tostring(pos.z)) .. ']'
     else
         -- Draw over the buttons
-        formspec = formspec .. 'button_exit[0,7.5;5.25,0.5;quit;Close dialog]' ..
+        formspec = formspec ..
+            'button_exit[0,7.5;5.25,0.5;quit;Close dialog]' ..
             'label[0,6.75;No waypoints. Add one with "/add_wp".]'
     end
 
     -- Display the formspec
-    return minetest.show_formspec(player, 'advmarkers-ssm', formspec)
+    return minetest.show_formspec(pname, 'advmarkers-ssm', formspec)
 end
+add_compat_function('display_formspec')
 
 -- Get waypoint position
 function advmarkers.get_chatcommand_pos(player, pos)
-    local pname = get_player(player, 0)
+    local pname = player:get_player_name()
 
     -- Validate the position
     if pos == 'h' or pos == 'here' then
-        pos = get_player(player, 1):get_pos()
+        pos = player:get_pos()
     elseif pos == 't' or pos == 'there' then
         if not advmarkers.last_coords[pname] then
             return false, 'No-one has used ".coords" and you have not died!'
@@ -280,6 +299,7 @@ function advmarkers.get_chatcommand_pos(player, pos)
     end
     return pos
 end
+add_compat_function('get_chatcommand_pos')
 
 local function register_chatcommand_alias(old, ...)
     local def = assert(minetest.registered_chatcommands[old])
@@ -320,11 +340,11 @@ minetest.register_chatcommand('add_mrkr', {
         if not s or not e then
             return false, 'Invalid syntax! See /help add_mrkr for more info.'
         end
-        local pos  = param:sub(1, s - 1)
+        local raw_pos = param:sub(1, s - 1)
         local name = param:sub(e + 1)
 
         -- Get the position
-        local pos, err = advmarkers.get_chatcommand_pos(pname, pos)
+        local pos, err = advmarkers.get_chatcommand_pos(pname, raw_pos)
         if not pos then
             return false, err
         end
@@ -343,7 +363,7 @@ register_chatcommand_alias('add_mrkr', 'add_wp', 'add_waypoint')
 
 -- Set the HUD
 minetest.register_on_player_receive_fields(function(player, formname, fields)
-    local pname, player = get_player(player)
+    local pname = player:get_player_name()
     if formname == 'advmarkers-ignore' then
         return true
     elseif formname ~= 'advmarkers-ssm' then
@@ -395,7 +415,8 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
             -- Teleport with /teleport
             local pos = advmarkers.get_waypoint(pname, name)
             if not pos then
-                minetest.chat_send_player(pname, 'Error teleporting to waypoint!')
+                minetest.chat_send_player(pname,
+                    'Error teleporting to waypoint!')
             elseif minetest.check_player_privs(pname, 'teleport') then
                 player:set_pos(pos)
                 minetest.chat_send_player(pname, 'Teleported to waypoint "' ..
@@ -405,7 +426,8 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
             end
         elseif fields.delete then
             minetest.show_formspec(pname, 'advmarkers-ssm', 'size[6,2]' ..
-                'label[0.35,0.25;Are you sure you want to delete this waypoint?]' ..
+                'label[0.35,0.25;Are you sure you want to delete this ' ..
+                    'waypoint?]' ..
                 'button[0,1;3,1;cancel;Cancel]' ..
                 'button[3,1;3,1;delete_confirm;Delete]')
         elseif fields.delete_confirm then
@@ -474,16 +496,16 @@ minetest.register_chatcommand('mrkr_import', {
     end
 })
 
-register_chatcommand_alias('mrkr_export', 'wp_import', 'waypoint_import')
+register_chatcommand_alias('mrkr_import', 'wp_import', 'waypoint_import')
 
 -- Chat channels .coords integration.
 -- You do not need to have chat channels installed for this to work.
 local function get_coords(msg, strict)
-    local s = 'Current Position: %-?[0-9]+, %-?[0-9]+, %-?[0-9]+%.'
+    local str = 'Current Position: %-?[0-9]+, %-?[0-9]+, %-?[0-9]+%.'
     if strict then
-        s = '^' .. s
+        str = '^' .. str
     end
-    local s, e = msg:find(s)
+    local s, e = msg:find(str)
     local pos = false
     if s and e then
         pos = string_to_pos(msg:sub(s + 18, e - 1))
@@ -492,7 +514,7 @@ local function get_coords(msg, strict)
 end
 
 -- Get global co-ords
-table.insert(minetest.registered_on_chat_messages, 1, function(name, msg)
+table.insert(minetest.registered_on_chat_messages, 1, function(_, msg)
     if msg:sub(1, 1) == '/' then return end
     local pos = get_coords(msg, true)
     if pos then
@@ -529,7 +551,7 @@ end)
 minetest.register_chatcommand('mrkrthere', {
     params      = '',
     description = 'Alias for "/mrkr there".',
-    func = function(name, param)
+    func = function(name, _)
         return minetest.registered_chatcommands['mrkr'].func(name, 'there')
     end
 })
@@ -537,10 +559,10 @@ minetest.register_chatcommand('mrkrthere', {
 minetest.register_chatcommand('clrmrkr', {
     params = '',
     description = 'Hides the displayed waypoint.',
-    func = function(name, param)
+    func = function(name, _)
         local player = minetest.get_player_by_name(name)
         if not hud[name] or not player then
-            return false, 'No waypoint is currently being displayed!' .. dump(hud)
+            return false, 'No waypoint is currently being displayed!'
         end
         player:hud_remove(hud[name])
         hud[name] = nil
@@ -597,5 +619,6 @@ end)
 
 -- Send waypoint list once SSCSMs are loaded.
 sscsm.register_on_sscsms_loaded(function(name)
-    sscsm.com_send(name, 'advmarkers:update', get_storage(name))
+    local player = minetest.get_player_by_name(name)
+    sscsm.com_send(name, 'advmarkers:update', get_storage(player))
 end)

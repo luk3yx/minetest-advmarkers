@@ -1,0 +1,13 @@
+name: luacheck
+
+on: [push, pull_request]
+
+jobs:
+  luacheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Run luacheck
+      uses: Roang-zero1/factorio-mod-luacheck@master
+      with:
+        luacheckrc_url: https://raw.githubusercontent.com/luk3yx/minetest-advmarkers/master/.luacheckrc
