@@ -26,12 +26,15 @@ local function pos_to_string(pos)
     end
 end
 
+local function dir_ok(n)
+    return type(n) == 'number' and abs(n) < 31000
+end
 local function string_to_pos(pos)
     if type(pos) == 'string' then
         pos = minetest.string_to_pos(pos)
     end
-    if type(pos) == 'table' and abs(pos.x) < 31000 and abs(pos.y) < 31000 and
-            abs(pos.z) < 31000 then
+    if type(pos) == 'table' and dir_ok(pos.x) and dir_ok(pos.y) and
+            dir_ok(pos.z) then
         return vector.round(pos)
     end
 end
