@@ -14,6 +14,8 @@ local hud = {}
 local use_sscsm = false
 advmarkers.last_coords = {}
 
+local abs, type = math.abs, type
+
 -- Convert positions to/from strings
 local function pos_to_string(pos)
     if type(pos) == 'table' then
@@ -28,7 +30,8 @@ local function string_to_pos(pos)
     if type(pos) == 'string' then
         pos = minetest.string_to_pos(pos)
     end
-    if type(pos) == 'table' then
+    if type(pos) == 'table' and abs(pos.x) < 31000 and abs(pos.y) < 31000 and
+            abs(pos.z) < 31000 then
         return vector.round(pos)
     end
 end
@@ -288,7 +291,7 @@ function advmarkers.get_chatcommand_pos(player, pos)
         pos = player:get_pos()
     elseif pos == 't' or pos == 'there' then
         if not advmarkers.last_coords[pname] then
-            return false, 'No-one has used ".coords" and you have not died!'
+            return false, 'No "there" position found!'
         end
         pos = advmarkers.last_coords[pname]
     else
@@ -498,25 +501,19 @@ minetest.register_chatcommand('mrkr_import', {
 
 register_chatcommand_alias('mrkr_import', 'wp_import', 'waypoint_import')
 
--- Chat channels .coords integration.
--- You do not need to have chat channels installed for this to work.
-local function get_coords(msg, strict)
-    local str = 'Current Position: %-?[0-9]+, %-?[0-9]+, %-?[0-9]+%.'
-    if strict then
-        str = '^' .. str
+-- Find co-ordinates sent in chat messages
+local function get_coords(msg)
+    if msg:byte(1) == 1 or #msg > 1000 then return end
+    local pos = msg:match('%-?[0-9%.]+, *%-?[0-9%.]+, *%-?[0-9%.]+')
+    if pos then
+        return string_to_pos(pos)
     end
-    local s, e = msg:find(str)
-    local pos = false
-    if s and e then
-        pos = string_to_pos(msg:sub(s + 18, e - 1))
-    end
-    return pos
 end
 
 -- Get global co-ords
 table.insert(minetest.registered_on_chat_messages, 1, function(_, msg)
     if msg:sub(1, 1) == '/' then return end
-    local pos = get_coords(msg, true)
+    local pos = get_coords(msg)
     if pos then
         advmarkers.last_coords = {}
         for _, player in ipairs(get_connected_players()) do
@@ -529,7 +526,7 @@ end)
 local old_chat_send_player = minetest.chat_send_player
 function minetest.chat_send_player(name, msg, ...)
     if type(name) == 'string' and type(msg) == 'string' and
-      get_player_by_name(name) then
+            get_player_by_name(name) then
         local pos = get_coords(msg)
         if pos then
             advmarkers.last_coords[name] = pos
@@ -590,30 +587,26 @@ sscsm.register({
 })
 
 -- SSCSM communication
--- TODO: Make this use a table (or multiple channels).
-sscsm.register_on_com_receive('advmarkers:cmd', function(name, param)
-    if type(param) ~= 'string' then
-        return
+sscsm.register_on_com_receive('advmarkers:delete', function(name, param)
+    if type(param) == 'string' then
+        advmarkers.delete_waypoint(name, param)
     end
+end)
 
-    local cmd = param:sub(1, 1)
-    if cmd == 'D' then
-        -- D: Delete
-        advmarkers.delete_waypoint(name, param:sub(2))
-    elseif cmd == 'S' then
-        -- S: Set
-        local s, e = param:find(' ', nil, true)
-        if s and e then
-            local pos = string_to_pos(param:sub(2, s - 1))
-            if pos then
-                advmarkers.set_waypoint(name, pos, param:sub(e + 1))
-            end
+sscsm.register_on_com_receive('advmarkers:set', function(name, param)
+    if type(param) == 'table' and type(param.name) == 'string' and
+            type(param.pos) == 'string' then
+        local pos = string_to_pos(param.pos)
+        if pos then
+            advmarkers.set_waypoint(name, pos, param.name)
         end
-    elseif cmd == '0' then
-        -- 0: Display
-        if not advmarkers.display_waypoint(name, param:sub(2)) then
-            minetest.chat_send_player(name, 'Error displaying waypoint!')
-        end
+    end
+end)
+
+sscsm.register_on_com_receive('advmarkers:display', function(name, param)
+    if type(param) ~= 'string' or
+            not advmarkers.display_waypoint(name, param) then
+        minetest.chat_send_player(name, 'Error displaying waypoint!')
     end
 end)
 

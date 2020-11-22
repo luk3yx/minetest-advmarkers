@@ -21,16 +21,10 @@ local function string_to_pos(pos)
     end
 end
 
--- Run remote command
--- TODO: Use separate SSCSM com channels
-local function run_remote_command(cmd, param)
-    sscsm.com_send('advmarkers:cmd', cmd .. (param or ''))
-end
-
 -- Display a waypoint
 function advmarkers.display_waypoint(name)
     if data[name] then
-        run_remote_command('0', name)
+        sscsm.com_send('advmarkers:display', name)
         return true
     end
     return false
@@ -46,7 +40,7 @@ advmarkers.get_marker = advmarkers.get_waypoint
 function advmarkers.delete_waypoint(name)
     if data[name] ~= nil then
         data[name] = nil
-        run_remote_command('D', name)
+        sscsm.com_send('advmarkers:delete', name)
     end
 end
 advmarkers.delete_marker = advmarkers.delete_waypoint
@@ -57,8 +51,10 @@ function advmarkers.set_waypoint(pos, name)
     if not pos then return end
     name = tostring(name)
     data[name] = pos
-    run_remote_command('S', minetest.pos_to_string(pos):gsub(' ', '') ..
-        ' ' .. name)
+    sscsm.com_send('advmarkers:set', {
+        name = name,
+        pos = minetest.pos_to_string(pos),
+    })
     return true
 end
 advmarkers.set_marker = advmarkers.set_waypoint
