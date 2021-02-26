@@ -514,7 +514,7 @@ local function get_coords(msg)
 end
 
 -- Get global co-ords
-table.insert(minetest.registered_on_chat_messages, 1, function(_, msg)
+minetest.register_on_chat_message(function(_, msg)
     if msg:sub(1, 1) == '/' then return end
     local pos = get_coords(msg)
     if pos then
