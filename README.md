@@ -1,4 +1,4 @@
-# advmarkers (non-CSM)
+# advmarkers
 
 A marker/waypoint mod for Minetest. Requires Minetest 5.0.0+, if you use Minetest 0.4 please try [this older version from June 2020](https://git.minetest.land/luk3yx/advmarkers/commit/25d7079069a53f2cece76ee2050bcdf690b4ea30).
 
