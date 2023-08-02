@@ -1,7 +1,7 @@
 --
 -- Minetest advmarkers mod
 --
--- © 2019 by luk3yx
+-- © 2023 by luk3yx
 --
 
 -- luacheck: ignore 432/player 43/ctx
