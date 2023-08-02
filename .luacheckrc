@@ -5,12 +5,14 @@ max_line_length = 80
 globals = {
     'advmarkers',
     'cloaking',
+    'flow',
     'minetest',
     'sscsm',
     'vector'
 }
 
 read_globals = {
+    math = {fields = {'round'}},
     string = {fields = {'split', 'trim'}},
-    table = {fields = {'copy'}},
+    table = {fields = {'copy', 'indexof'}},
 }
