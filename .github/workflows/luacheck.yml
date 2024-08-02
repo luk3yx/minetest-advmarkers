@@ -6,8 +6,8 @@ jobs:
   luacheck:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v4
     - name: Run luacheck
       uses: Roang-zero1/factorio-mod-luacheck@master
       with:
-        luacheckrc_url: https://raw.githubusercontent.com/luk3yx/minetest-advmarkers/master/.luacheckrc
+        luacheckrc_url: ""
