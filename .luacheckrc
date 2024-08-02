@@ -12,6 +12,7 @@ globals = {
 }
 
 read_globals = {
+    'sway',
     math = {fields = {'round'}},
     string = {fields = {'split', 'trim'}},
     table = {fields = {'copy', 'indexof'}},
