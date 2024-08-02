@@ -200,7 +200,7 @@ local waypoints_gui = flow.make_gui(function(player, ctx)
         }
     end
 
-    local vbox = {name = "advmarkers:waypoints", h = 5.8}
+    local vbox = {name = "waypoints", h = 5.8}
     local search = (ctx.form.mrkr_search or ""):lower()
     for i, wp_name in ipairs(advmarkers.get_waypoint_names(player)) do
         if search == "" or wp_name:lower():find(search, 1, true) then
@@ -332,4 +332,19 @@ end)
 
 function advmarkers.display_formspec(player)
     waypoints_gui:show(player)
+end
+
+if minetest.global_exists("sway") then
+    local pagename = "advmarkers"
+    sway.register_page(pagename .. ":waypoints", {
+        title = S("Waypoints"),
+        get = function(_, player, _)
+            return sway.Form{
+                waypoints_gui:embed{
+                    player = player,
+                    name = pagename,
+                }
+            }
+        end
+    })
 end
